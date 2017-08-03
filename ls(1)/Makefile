@@ -1,7 +1,9 @@
 ls : ls.c
-	gcc -o ls ls.c
+	gcc -o $@ ls.c
 
-.PHONY : test
-test:
+run :
+	@echo -e "*****show cwd*****\n"
 	./ls
-
+	@echo -e "\n\n*****show .. and /*****\n"
+	./ls .. /
+.PHONY : run
