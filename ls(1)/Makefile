@@ -5,6 +5,3 @@ ls : ls.c
 test:
 	./ls
 
-.PHONY : clean
-clean:
-	echo clean
