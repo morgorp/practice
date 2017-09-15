@@ -1,39 +1,29 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <signal.h>
-#include <sys/wait.h>
+#include <pthread.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-void childproc_handle(int sig)
+void *serve_routine(void *arg)
 {
-	while(waitpid(-1, NULL, 0) > 0);
-}
-
-void serve_routine(int fd)
-{
+	int fd = *((int *)arg);
 	char buf[1024];
 	int len;
 	while((len = read(fd, buf, sizeof(buf))) >0 ) {
 		write(fd, buf, len);
 	}
 	close(fd);
+	return NULL;
 }
 
 int main(int argc, char *argv[])
 {
 	int port;
 	sscanf(argv[1], "%d", &port);
-	
-	struct sigaction act;
-	act.sa_handler = childproc_handle;
-	sigemptyset(&act.sa_mask);
-	act.sa_flags = 0;
-	sigaction(SIGCHLD, &act, 0);
 
 	int serv_fd = socket(PF_INET, SOCK_STREAM, 0);
-	
+
 	struct sockaddr_in serv_addr = {0};
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -45,6 +35,9 @@ int main(int argc, char *argv[])
 
 	listen(serv_fd, 50);
 	
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 	for(;;) {
 		struct sockaddr_in clnt_addr = {0};
 		socklen_t socklen = sizeof(clnt_addr);
@@ -53,20 +46,10 @@ int main(int argc, char *argv[])
 
 		puts("New client.");
 
-		int pid = fork();
-		if(pid == -1) {
-			close(clnt_fd);
-			continue;
-		}
-
-		if(pid == 0) {
-			close(serv_fd);
-			serve_routine(clnt_fd);
-			return 0;
-		} else {
-			close(clnt_fd);
-		}
+		pthread_t tid;
+		pthread_create(&tid, &attr, serve_routine, &clnt_fd);	
 	}
+	pthread_attr_destroy(&attr);
 	close(serv_fd);
 	return 0;
 }
